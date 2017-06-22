@@ -1,9 +1,10 @@
+/*********************************************************/
+/******** Rename JPEG files with ImageMagick *************/
 const im   = require('imagemagick'),
       exif = require('fast-exif'),
       util = require('util'),
       path = require('path'),
       fs   = require('fs');
-
 
 
 /*------- ORIGINAL --------------------------------------*/
