@@ -6,8 +6,8 @@
   "scripts": {
     "test": "nodejs app.js"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "Ben Morin",
+  "license": "MIT",
   "dependencies": {
     "fast-exif": "^1.0.1",
     "imagemagick": "^0.1.3"
