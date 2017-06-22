@@ -1,0 +1,15 @@
+{
+  "name": "photo-rename",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "test": "nodejs app.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "fast-exif": "^1.0.1",
+    "imagemagick": "^0.1.3"
+  }
+}
