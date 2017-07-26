@@ -7,46 +7,9 @@ const im   = require('imagemagick'),
       fs   = require('fs');
 
 
-/*------- ORIGINAL --------------------------------------*/
-// String, Function Array -> Void
-// renames all jpg/jpegs in a dir to the value found in their own image data
-function imageDescriptions(imgs, dir){ 
-    imgs.forEach((img) => {
-        let oldPath = dir + '/' + img;
-        
-        im.identify(oldPath, (err, data) => {
-            if(err) return console.error(err);
-    
-            if(data.profiles['image name[2,5]']){
-                let newName = formatDescription(data.profiles['image name[2,5]']);
-                let newPath = dir + '/' + newName + '.jpg';
-                
-                console.log('Renaming: ' + oldPath + '\nTo: ' + newPath);
-                
-                fs.rename(oldPath, newPath, (err) => {
-                    if(err) return console.error(err);
-                });
-            }    
-        }); 
-    });  
-}
-
-// String Function -> Void
-// creates an array of all .jpg files in a directory
-function renameJPGs(dir){
-    return fs.readdir(dir, (err, files) => {
-        if(err) return console.error(err);
-        
-        let jpgs = files.filter(isJPEG);
-        
-        return imageDescriptions(jpgs, dir);
-    });
-}
-/*------- END ORIGINAL ----------------------------------*/
-
-// String -> Promise
-// takes in an at specified path: imgPath, and returns a Promise
-// based on im.identify
+/* String -> Promise
+    takes in an at specified path: imgPath, and returns 
+    a Promise based on im.identify  */
 function createIdentifyAsPromise(imgPath){
     return new Promise((success, failure) => {
         return im.identify(imgPath, (err, data) => {
@@ -57,16 +20,16 @@ function createIdentifyAsPromise(imgPath){
     });
 }
 
-// allows util.promisify to use im.identify
+/* allows util.promisify to use im.identify */
 im.identify[util.promisify.custom] = createIdentifyAsPromise;
 
 
-// Object, Object, String, String, String -> Void ...
-// takes in IM image data and cache, as well as an image name, its absolute path,
-// and its current working directory
-// and renames the image file based on the appropriate data
-// if a file with the same IM data signature has been encountered, it will
-// ignore the current file
+/* Object, Object, String, String, String -> Void
+    takes in IM image data and cache, as well as an image name, its absolute path,
+    and its current working directory
+    and renames the image file based on the appropriate meta-data
+    if a file with the same IM data signature has been encountered, it will
+    ignore the current file  */
 function dataToName(data, cache, img, imgPath, cwd){
     const fsRename = util.promisify(fs.rename);
     
@@ -88,7 +51,6 @@ function dataToName(data, cache, img, imgPath, cwd){
             newName = formatDescription(data.profiles['image name[2,5]']);
             cache.files[data.properties.signature] = true;
             
-            // prevents files with same description from replacing each other
             if(newName in cache.names){
                 cache.names[newName] += 1;
             } else {
@@ -104,7 +66,7 @@ function dataToName(data, cache, img, imgPath, cwd){
             return console.log('DATA PROFILE IS UNDEFINED:', imgPath);
         } else {    
             return fsRename(imgPath, newPath).then(() => {
-                console.log('old: ' + img + '\tnew: ' + newName + '-' + cache.names[newName] + '.jpg');
+                return console.log('old: ' + img + '\tnew: ' + newName + '-' + cache.names[newName] + '.jpg');
             }).catch(console.error);
         }
 
@@ -113,11 +75,10 @@ function dataToName(data, cache, img, imgPath, cwd){
     }
 }
 
-// String, String, String, Object -> Void
-// renames an existing image: img, at the existing path: imgPath,
-// in the directory: cwd, using ImageMagick data attributes embedded
-// within the image, while the cache ensures multiples images do not
-// receive the same name
+/* String, String, String, Object -> Void
+    renames an existing image in the the CWD using ImageMagick 
+    data attributes embedded within the image, while the cache 
+    ensures multiples images do not receive the same name  */
 function renameImgWithIM(imgPath, img, cwd, cache){
     const IM_identify = util.promisify(im.identify);
     
@@ -126,18 +87,18 @@ function renameImgWithIM(imgPath, img, cwd, cache){
     }).catch(console.error);
 }
 
-// String, String, String -> Void
-// renames an existing image: img, at the existing path: imgPath,
-// in the directory: cwd, using EXIF data attributes embedded within the image
+/* String, String, String -> Void
+    renames an existing image in the CWD, using EXIF data 
+    attributes embedded within the image  */
 function renameImgWithEXIF(imgPath, img, cwd){
     return exif.read(imgPath).then((data) => {
         console.log(img + ': ' + data.image.ImageDescription);
     }).catch(console.error)
 }
 
-// String -> String
-// formats an image description to replace spaces, '\', & '/' with '-', and all 
-// lower case letters
+/* String -> String
+    formats an image description to replace spaces, '\', & '/' with '-', 
+    and all lower case letters  */
 function formatDescription(imgDesc){
     let desc = imgDesc.toLowerCase();
     let re = /\s|\\|\//gi;
@@ -146,8 +107,8 @@ function formatDescription(imgDesc){
 }
 
 
-// String -> Boolean
-// checks file extension to ensure a jpg/jpeg file
+/* String -> Boolean
+    checks file extension to ensure a jpg/jpeg file  */
 function isJPEG(file){
     let checkEnd = (f, p, j) => { return f.substring(f.length - p, f.length) === j; };
     let checkFront = (f) => { return f.substring(0, 2) !== '._'; };
@@ -158,21 +119,20 @@ function isJPEG(file){
     return (jpg || jpeg) && checkFront(file);
 }
 
-// String -> Void
-// checks a given directory for JPEGs to rename, if none are present, 
-// the program moves into each directory present
+/* String -> Void
+    checks a given directory for JPEGs to rename, if none are present, 
+    the program moves into each sub directory present  */
 function checkForJPEGs(absRootDir){
     const readdir_PROM = util.promisify(fs.readdir);
     const fStat_PROM   = util.promisify(fs.stat);
     
-    // to prevent duplicate descriptions from overwriting different files
     const cache = {
         names: {},
         files: {}
     };
  
-    // String -> Array
-    // checks directory for JPEG files
+    /* String -> Array
+        checks directory for JPEG files  */
     async function checkDirectory(parent){
         try {
             const dirContent = await readdir_PROM(parent);
@@ -183,9 +143,10 @@ function checkForJPEGs(absRootDir){
         }   
     }
     
-    // String -> String or False
-    // checks to see if a given file is a JPEG/JPG, 
-    // if the file is a JPEG/JPG, the file is renamed, else returns false
+    /* String -> String or False
+        checks to see if a given file is a JPEG/JPG, 
+        if the file is a JPEG/JPG, the file is renamed, 
+        else returns false  */
     async function checkFile(parent, file){
         try {
             const filePath = path.join(parent, file);
@@ -203,9 +164,9 @@ function checkForJPEGs(absRootDir){
         
     }
     
-    // String -> String or False
-    // checks to see if a given file is a directory, returns the dirName,
-    // false otherwise
+    /* String -> String or False
+        checks to see if a given file is a directory, 
+        returns the dirName, false otherwise  */
     async function checkDir(parent, dir){
         try{
             const dirPath = path.join(parent, dir);
@@ -220,8 +181,8 @@ function checkForJPEGs(absRootDir){
         }        
     }
 
-    // Array -> Void
-    // checks directory for JPEG files
+    /* Array -> Void
+        checks directory for JPEG files  */
     async function checkDirContents(parent, dc){
         return dc.forEach((file) => {
             checkDir(parent, file).then((dirRes) => {
